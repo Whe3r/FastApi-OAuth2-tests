@@ -42,7 +42,7 @@ class Token(BaseModel):
     token_type: str
 
 
-class AccountsModel(BaseModel):
+class AccountModel(BaseModel):
     id: int
     user_id: int
     user_balance: float
