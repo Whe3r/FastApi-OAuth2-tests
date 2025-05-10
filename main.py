@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from datetime import datetime, timedelta, timezone
-from models import User, UserOut, UserAuth, Token, Base, Account, AccountsModel
+from models import User, UserOut, UserAuth, Token, Base, Account, AccountModel
 from starlette import status
 import bcrypt
 import os
