@@ -1,11 +1,18 @@
 import os
 
 from fastapi.testclient import TestClient
+
+from bank import FinancialServices
 from main import app
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
 from models import Base, User
 import jwt
+
+from models import Base, User, Account
+
+
 from main import hash_password
 import pytest
 
@@ -54,4 +61,29 @@ def test_fail_login():
     response = client.post("/authorization",
                            data={"username": "fakeuser", "password": "fakepassword"})
     assert response.status_code == 401
+
+
+def test_deposit():
+    db = TestSessionLocal()
+    hashed_password = hash_password("test")
+    new_user = User(username="testuser", email="test@mexample.com", password=hashed_password)
+    db.add(new_user)
+    db.commit()
+    login_response = client.post("/authorization", data={"username": "testuser", "password": "test"})
+    assert login_response.status_code == 200
+    token = login_response.json().get("access_token")
+    assert token is not None
+
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+    params = {
+        "fs_id": 3,
+        "amount": 1000
+    }
+    response = client.post("/deposit", headers=headers, params=params)
+
+
+    assert response.status_code == 200
+
 

@@ -1,8 +1,10 @@
-from fastapi import FastAPI, Depends, HTTPException
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import FastAPI, Depends, HTTPException, Form, Query
+from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from datetime import datetime, timedelta, timezone
+
+from bank import FinancialServices
 from models import User, UserOut, UserAuth, Token, Base, Account, AccountModel
 from starlette import status
 import bcrypt
@@ -11,11 +13,12 @@ from dataclasses import dataclass
 
 import jwt
 
-# DATABASE_URL = os.getenv('DATABASE_URL')
-DATABASE_URL = 'postgresql://postgres:admin@localhost/test_db'
+DATABASE_URL = os.getenv('DATABASE_URL')
+# DATABASE_URL = 'postgresql://postgres:admin@localhost/test_db'
 SECRET_KEY = "614bee45bb6735f3b22a24041059fd33ff42572f493c5896bab894c794a7ad37"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 20
+oauth_scheme = OAuth2PasswordBearer(tokenUrl="authorization")
 
 app = FastAPI()
 
@@ -36,14 +39,14 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encode_jwt
 
 
-async def get_current_user(token: str = Depends()):
+async def get_current_user(token: str = Depends(oauth_scheme)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.encode(token, SECRET_KEY, algorithm=[ALGORITHM])
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception
@@ -91,3 +94,44 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.post("/deposit")
+async def deposit(fs_id: int = Query(...), amount: float = Query(...), current_user: User = Depends(get_current_user)):
+    fs = FinancialServices(id=fs_id, user_id=current_user.id)
+    try:
+        balance = fs.deposit(user_id=current_user.id, amount=amount, sm=SessionLocal)
+        return {"user_balance": balance}
+    except ValueError:
+        raise HTTPException(status_code=400)
+
+
+@app.post("/withdraw")
+async def withdraw(fs_id: int, amount: float, current_user: User = Depends(get_current_user)):
+    fs = FinancialServices(id=fs_id, user_id=current_user.id)
+    try:
+        balance = fs.withdraw(user_id=current_user.id, amount=amount, sm=SessionLocal)
+        return {"user_balance": balance}
+    except ValueError:
+        raise HTTPException(status_code=400)
+
+
+@app.post("/send")
+async def send(fs_id: int, amount: float, recipient_id: int, current_user: User = Depends(get_current_user)):
+    fs = FinancialServices(id=fs_id, user_id=current_user.id)
+    try:
+        sender_balance, recipient_balance = fs.send_to(amount=amount, user_id=current_user.id,
+                                                       send_to_user_id=recipient_id, sm=SessionLocal)
+        return {"sender_balance": sender_balance, "recipient_balance": recipient_balance}
+    except ValueError:
+        raise HTTPException(status_code=400)
+
+
+@app.get("/show-balance")
+async def show_balance(fs_id: int, current_user: User = Depends(get_current_user)):
+    fs = FinancialServices(id=fs_id, user_id=current_user.id)
+    try:
+        balance = fs.show_balance(user_id=current_user.id, sm=SessionLocal)
+        return {"user_balance": balance}
+    except ValueError:
+        raise HTTPException(status_code=400)
