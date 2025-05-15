@@ -31,6 +31,7 @@ class UserAuth(BaseModel):
     password: str
 
 
+
 class UserOut(BaseModel):
     id: int
     username: str
