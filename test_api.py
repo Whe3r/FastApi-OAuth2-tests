@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from main import app
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app.models import Base, User
+from models import Base, User
 import jwt
 from main import hash_password
 import pytest

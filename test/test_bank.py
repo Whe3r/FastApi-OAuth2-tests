@@ -1,7 +1,8 @@
 import unittest
 from unittest.mock import Mock, MagicMock
-from bank import FinancialServices
+
 from models import Account
+from bank import FinancialServices
 
 
 class MyTestCase(unittest.TestCase):
