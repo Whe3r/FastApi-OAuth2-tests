@@ -1,4 +1,3 @@
-
 from sqlalchemy import Column, Integer, String, ForeignKey, Float
 from pydantic import BaseModel
 from sqlalchemy.orm import declarative_base, relationship
@@ -14,6 +13,7 @@ class User(Base):
     email = Column(String, unique=True)
     password = Column(String)
     account = relationship("Account", back_populates="user")
+    financial_services = relationship("FinancialServiceModel", back_populates="user")
 
 
 class Account(Base):
@@ -25,11 +25,19 @@ class Account(Base):
     user = relationship("User", back_populates="account")
 
 
+class FinancialServiceModel(Base):
+    __tablename__ = "financial_services"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    user = relationship("User", back_populates="financial_services")
+
+
 class UserAuth(BaseModel):
     username: str
     email: str
     password: str
-
 
 
 class UserOut(BaseModel):

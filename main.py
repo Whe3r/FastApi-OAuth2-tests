@@ -1,16 +1,16 @@
-from fastapi import FastAPI, Depends, HTTPException, Form, Query
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy import create_engine
 from datetime import datetime, timedelta, timezone
 
 from bank import FinancialServices
-from models import User, UserOut, UserAuth, Token, Base, Account, AccountModel
+from models import User, UserOut, UserAuth, Token, Base, Account
 from starlette import status
 import bcrypt
 import os
-from dataclasses import dataclass
 
+from jwt import PyJWTError
 import jwt
 
 DATABASE_URL = os.getenv('DATABASE_URL')
@@ -28,6 +28,14 @@ SessionLocal = sessionmaker(autoflush=False, autocommit=False, bind=engine)
 Base.metadata.create_all(bind=engine)
 
 
+def get_db() -> Session:
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
     if expires_delta:
@@ -39,23 +47,18 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encode_jwt
 
 
-async def get_current_user(token: str = Depends(oauth_scheme)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+async def get_current_user(token: str = Depends(oauth_scheme), db: Session = Depends(get_db)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
-            raise credentials_exception
-    except Exception:
-        raise credentials_exception
-    db = SessionLocal()
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
     user = db.query(User).filter(User.username == username).first()
     if user is None:
-        raise credentials_exception
+        raise HTTPException(status_code=400, detail="Пользователь не найден")
     return user
 
 
@@ -68,8 +71,7 @@ def check_password(plain_password: str, hashed_password: str):
 
 
 @app.post("/register", response_model=UserOut)
-async def create_user(data: UserAuth):
-    db = SessionLocal()
+async def create_user(data: UserAuth, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == data.username).first()
     if user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User exists")
@@ -78,12 +80,14 @@ async def create_user(data: UserAuth):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    new_account = Account(user_id=new_user.id, user_balance=0)
+    db.add(new_account)
+    db.commit()
     return new_user
 
 
 @app.post("/authorization", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    db = SessionLocal()
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == form_data.username).first()
     if not user or not check_password(form_data.password, user.password):
         raise HTTPException(
@@ -97,41 +101,45 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
 
 @app.post("/deposit")
-async def deposit(fs_id: int = Query(...), amount: float = Query(...), current_user: User = Depends(get_current_user)):
+async def deposit(fs_id: int, amount: float, current_user: User = Depends(get_current_user),
+                  db: Session = Depends(get_db)):
     fs = FinancialServices(id=fs_id, user_id=current_user.id)
     try:
-        balance = fs.deposit(user_id=current_user.id, amount=amount, sm=SessionLocal)
+        balance = fs.deposit(user_id=current_user.id, amount=amount, db=db)
         return {"user_balance": balance}
-    except ValueError:
-        raise HTTPException(status_code=400)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/withdraw")
-async def withdraw(fs_id: int, amount: float, current_user: User = Depends(get_current_user)):
+async def withdraw(fs_id: int, amount: float, current_user: User = Depends(get_current_user),
+                   db: Session = Depends(get_db)):
     fs = FinancialServices(id=fs_id, user_id=current_user.id)
     try:
-        balance = fs.withdraw(user_id=current_user.id, amount=amount, sm=SessionLocal)
+        balance = fs.withdraw(user_id=current_user.id, amount=amount, db=db)
         return {"user_balance": balance}
     except ValueError:
         raise HTTPException(status_code=400)
 
 
 @app.post("/send")
-async def send(fs_id: int, amount: float, recipient_id: int, current_user: User = Depends(get_current_user)):
+async def send(fs_id: int, amount: float, recipient_id: int, current_user: User = Depends(get_current_user),
+               db: Session = Depends(get_db)):
     fs = FinancialServices(id=fs_id, user_id=current_user.id)
     try:
         sender_balance, recipient_balance = fs.send_to(amount=amount, user_id=current_user.id,
-                                                       send_to_user_id=recipient_id, sm=SessionLocal)
+                                                       send_to_user_id=recipient_id, db=db)
         return {"sender_balance": sender_balance, "recipient_balance": recipient_balance}
     except ValueError:
         raise HTTPException(status_code=400)
 
 
 @app.get("/show-balance")
-async def show_balance(fs_id: int, current_user: User = Depends(get_current_user)):
+async def show_balance(fs_id: int, current_user: User = Depends(get_current_user),
+                       db: Session = Depends(get_db)):
     fs = FinancialServices(id=fs_id, user_id=current_user.id)
     try:
-        balance = fs.show_balance(user_id=current_user.id, sm=SessionLocal)
+        balance = fs.show_balance(user_id=current_user.id, db=db)
         return {"user_balance": balance}
     except ValueError:
         raise HTTPException(status_code=400)
