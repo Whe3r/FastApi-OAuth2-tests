@@ -1,4 +1,4 @@
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 
 from models import Account
 from dataclasses import dataclass
@@ -13,8 +13,7 @@ class FinancialServices:
     id: int
     user_id: int
 
-    def deposit(self, user_id: int, amount: float, sm: sessionmaker) -> float:
-        db = sm()
+    def deposit(self, user_id: int, amount: float, db: Session) -> float:
         user_account = db.query(Account).filter(Account.user_id == user_id).first()
         if user_account:
             if amount <= 0:
@@ -25,8 +24,8 @@ class FinancialServices:
             return user_account.user_balance
         raise ValueError("Пользователь не найден")
 
-    def withdraw(self, user_id: int, amount: float, sm: sessionmaker) -> float:
-        db = sm()
+    def withdraw(self, user_id: int, amount: float, db: Session) -> float:
+
         user_account = db.query(Account).filter(Account.user_id == user_id).first()
         if user_account:
             if amount <= 0 or amount > user_account.user_balance:
@@ -37,8 +36,8 @@ class FinancialServices:
             return user_account.user_balance
         raise ValueError("Пользователь не найден")
 
-    def send_to(self, amount: float, user_id: int, send_to_user_id: int, sm: sessionmaker) -> [float]:
-        db = sm()
+    def send_to(self, amount: float, user_id: int, send_to_user_id: int, db: Session) -> [float]:
+
         user_account = db.query(Account).filter(Account.user_id == user_id).first()
         if not user_account:
             raise ValueError("Отправитель не найден")
@@ -58,8 +57,8 @@ class FinancialServices:
 
         return user_account.user_balance, recipient_account.user_balance
 
-    def show_balance(self, user_id: int, sm: sessionmaker) -> float:
-        db = sm()
+    def show_balance(self, user_id: int, db: Session) -> float:
+
         user_account = db.query(Account).filter(Account.user_id == user_id).first()
         if user_account:
             logger.info(f"Ваш баланс {user_account.user_balance}")

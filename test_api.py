@@ -1,13 +1,8 @@
-import os
-
 from fastapi.testclient import TestClient
-
-from bank import FinancialServices
-from main import app
+from main import app, check_password
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from models import Base, User, Account
-
+from models import Base, User
 from main import hash_password
 import pytest
 
@@ -15,6 +10,16 @@ SQLALCHEMY_DATABASE_URL = "sqlite:///D:\\database.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=False)
 TestSessionLocal = sessionmaker(autoflush=False, autocommit=False, bind=engine)
 Base.metadata.create_all(bind=engine)
+
+
+@pytest.fixture
+def get_test_db():
+    db = TestSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 
 client = TestClient(app)
 
@@ -39,13 +44,17 @@ def test_register_user():
     assert isinstance(data["password"], str)
 
 
-def test_login_user():
-    db = TestSessionLocal()
-    hashed_password = hash_password('aaw213')
+def test_login_user(get_test_db):
+    db = get_test_db
+    password_plain = 'aaw213'
+    hashed_password = hash_password(password_plain)
+    print(f"Hashed password: {hashed_password}")
     new_user = User(username='user', email='test12@mail.ru', password=hashed_password)
     db.add(new_user)
     db.commit()
-    response = client.post("/authorization", data={"username": "user", "password": "aaw213"})
+    db.refresh(new_user)
+
+    response = client.post("/authorization", data={"username": "user", "password": password_plain})
     assert response.status_code == 200
     data = response.json()
     assert "access_token" in data
@@ -80,5 +89,4 @@ def test_deposit():
 
 
     assert response.status_code == 200
-
 
