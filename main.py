@@ -118,8 +118,8 @@ async def withdraw(fs_id: int, amount: float, current_user: User = Depends(get_c
     try:
         balance = fs.withdraw(user_id=current_user.id, amount=amount, db=db)
         return {"user_balance": balance}
-    except ValueError:
-        raise HTTPException(status_code=400)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/send")
@@ -130,8 +130,8 @@ async def send(fs_id: int, amount: float, recipient_id: int, current_user: User 
         sender_balance, recipient_balance = fs.send_to(amount=amount, user_id=current_user.id,
                                                        send_to_user_id=recipient_id, db=db)
         return {"sender_balance": sender_balance, "recipient_balance": recipient_balance}
-    except ValueError:
-        raise HTTPException(status_code=400)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/show-balance")
@@ -141,5 +141,5 @@ async def show_balance(fs_id: int, current_user: User = Depends(get_current_user
     try:
         balance = fs.show_balance(user_id=current_user.id, db=db)
         return {"user_balance": balance}
-    except ValueError:
-        raise HTTPException(status_code=400)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
