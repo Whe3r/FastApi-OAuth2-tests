@@ -9,23 +9,26 @@ from models import User, UserOut, UserAuth, Token, Base, Account
 from starlette import status
 import bcrypt
 import os
+from dotenv import load_dotenv
 
 from jwt import PyJWTError
 import jwt
 
+if not os.getenv("PYTEST_CURRENT_TEST"):
+    load_dotenv(dotenv_path=".env")
+
 DATABASE_URL = os.getenv('DATABASE_URL')
-# DATABASE_URL = 'postgresql://postgres:admin@localhost/test_db'
 SECRET_KEY = "614bee45bb6735f3b22a24041059fd33ff42572f493c5896bab894c794a7ad37"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 20
 oauth_scheme = OAuth2PasswordBearer(tokenUrl="authorization")
 
-app = FastAPI()
-
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, echo=False)
 SessionLocal = sessionmaker(autoflush=False, autocommit=False, bind=engine)
 
 Base.metadata.create_all(bind=engine)
+
+app = FastAPI()
 
 
 def get_db():
@@ -139,3 +142,6 @@ async def show_balance(current_user: User = Depends(get_current_user)):
         return {"user_balance": balance}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+
