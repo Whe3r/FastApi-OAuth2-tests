@@ -2,21 +2,28 @@ from datetime import datetime, timezone, timedelta
 
 import jwt
 from fastapi.testclient import TestClient
-from main import app, check_password, SECRET_KEY, ALGORITHM
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from models import Base, User, Account
-from main import hash_password
+
 import pytest
+import os
+from dotenv import load_dotenv
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///D:\\database.db"
+load_dotenv(dotenv_path=".env.test")
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=False)
+from main import app, get_db
+from main import hash_password
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is not set for testing")
+
+engine = create_engine(DATABASE_URL, echo=False)
 TestSessionLocal = sessionmaker(autoflush=False, autocommit=False, bind=engine)
-Base.metadata.create_all(bind=engine)
 
 
-@pytest.fixture
 def get_test_db():
     db = TestSessionLocal()
     try:
@@ -24,6 +31,8 @@ def get_test_db():
     finally:
         db.close()
 
+
+app.dependency_overrides[get_db] = get_test_db
 
 client = TestClient(app)
 
@@ -48,10 +57,10 @@ def test_register_user():
     assert isinstance(data["password"], str)
 
 
-def test_login_user(get_test_db):
+def test_login_user():
     password_plain = 'aaw213'
     hashed_password = hash_password(password_plain)
-    db = get_test_db
+    db = TestSessionLocal()
     new_user = User(username='user', email='test12@mail.ru', password=hashed_password)
     db.add(new_user)
     db.commit()
@@ -148,7 +157,6 @@ def test_send():
         "Authorization": f"Bearer {token}"
     }
     params = {
-        "fs_id": 3,
         "amount": 5000,
         "recipient_id": 2
     }
@@ -179,10 +187,7 @@ def test_show_balance():
     headers = {
         "Authorization": f"Bearer {token}"
     }
-    params = {
-        "fs_id": 3
-    }
-    response = client.get("/show-balance", headers=headers, params=params)
+    response = client.get("/show-balance", headers=headers)
     data = response.json()
     assert response.status_code == 200
     assert "user_balance" in data
@@ -208,7 +213,6 @@ def test_deposit_negative_amount():
         "Authorization": f"Bearer {token}"
     }
     params = {
-        "fs_id": 3,
         "amount": -1000
     }
     response = client.post("/deposit", headers=headers, params=params)
@@ -233,7 +237,6 @@ def test_deposit_user_not_found():
         "Authorization": f"Bearer {token}"
     }
     params = {
-        "fs_id": 3,
         "amount": 1000
     }
     response = client.post("/deposit", headers=headers, params=params)
@@ -260,7 +263,6 @@ def test_withdraw_amount_negative():
         "Authorization": f"Bearer {token}"
     }
     params = {
-        "fs_id": 3,
         "amount": -5000
     }
     response = client.post("/withdraw", headers=headers, params=params)
@@ -283,7 +285,9 @@ def test_withdraw_exceeding_balance():
     assert token is not None
 
     headers = {"Authorization": f"Bearer {token}"}
-    params = {"fs_id": 1, "amount": 5000}
+    params = {
+        "amount": 5000
+    }
 
     response = client.post("/withdraw", headers=headers, params=params)
 
@@ -307,7 +311,6 @@ def test_withdraw_user_not_found():
         "Authorization": f"Bearer {token}"
     }
     params = {
-        "fs_id": 3,
         "amount": 5000
     }
     response = client.post("/withdraw", headers=headers, params=params)
@@ -335,7 +338,6 @@ def test_send_sender_not_found():
         "Authorization": f"Bearer {token}"
     }
     params = {
-        "fs_id": 3,
         "amount": 5000,
         "recipient_id": 2
     }
@@ -364,7 +366,6 @@ def test_send_recipient_not_found():
         "Authorization": f"Bearer {token}"
     }
     params = {
-        "fs_id": 3,
         "amount": 5000,
         "recipient_id": 2
     }
@@ -395,7 +396,6 @@ def test_send_amount_negative():
         "Authorization": f"Bearer {token}"
     }
     params = {
-        "fs_id": 3,
         "amount": -5000,
         "recipient_id": 2
     }
@@ -425,7 +425,6 @@ def test_send_exceeding_balance():
         "Authorization": f"Bearer {token}"
     }
     params = {
-        "fs_id": 3,
         "amount": 5000,
         "recipient_id": 2
     }
@@ -449,9 +448,6 @@ def test_show_balance_user_not_found():
     headers = {
         "Authorization": f"Bearer {token}"
     }
-    params = {
-        "fs_id": 3
-    }
-    response = client.get("/show-balance", headers=headers, params=params)
+    response = client.get("/show-balance", headers=headers)
     assert response.status_code == 400
     assert response.json()["detail"] == "Пользователь не найден"
