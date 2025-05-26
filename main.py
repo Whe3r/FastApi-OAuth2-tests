@@ -28,12 +28,16 @@ SessionLocal = sessionmaker(autoflush=False, autocommit=False, bind=engine)
 Base.metadata.create_all(bind=engine)
 
 
-def get_db() -> Session:
+def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+
+db = next(get_db())
+fs = FinancialServices(db=db)
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
@@ -101,45 +105,37 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
 
 
 @app.post("/deposit")
-async def deposit(fs_id: int, amount: float, current_user: User = Depends(get_current_user),
-                  db: Session = Depends(get_db)):
-    fs = FinancialServices(id=fs_id, user_id=current_user.id)
+async def deposit(amount: float, current_user: User = Depends(get_current_user)):
     try:
-        balance = fs.deposit(user_id=current_user.id, amount=amount, db=db)
+        balance = fs.deposit(user_id=current_user.id, amount=amount)
         return {"user_balance": balance}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/withdraw")
-async def withdraw(fs_id: int, amount: float, current_user: User = Depends(get_current_user),
-                   db: Session = Depends(get_db)):
-    fs = FinancialServices(id=fs_id, user_id=current_user.id)
+async def withdraw(amount: float, current_user: User = Depends(get_current_user)):
     try:
-        balance = fs.withdraw(user_id=current_user.id, amount=amount, db=db)
+        balance = fs.withdraw(user_id=current_user.id, amount=amount)
         return {"user_balance": balance}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/send")
-async def send(fs_id: int, amount: float, recipient_id: int, current_user: User = Depends(get_current_user),
-               db: Session = Depends(get_db)):
-    fs = FinancialServices(id=fs_id, user_id=current_user.id)
+async def send(amount: float, recipient_id: int, current_user: User = Depends(get_current_user)):
     try:
         sender_balance, recipient_balance = fs.send_to(amount=amount, user_id=current_user.id,
-                                                       send_to_user_id=recipient_id, db=db)
+                                                       send_to_user_id=recipient_id)
         return {"sender_balance": sender_balance, "recipient_balance": recipient_balance}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/show-balance")
-async def show_balance(fs_id: int, current_user: User = Depends(get_current_user),
-                       db: Session = Depends(get_db)):
-    fs = FinancialServices(id=fs_id, user_id=current_user.id)
+async def show_balance(current_user: User = Depends(get_current_user)):
     try:
-        balance = fs.show_balance(user_id=current_user.id, db=db)
+        balance = fs.show_balance(user_id=current_user.id)
         return {"user_balance": balance}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

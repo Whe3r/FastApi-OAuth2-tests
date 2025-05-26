@@ -10,6 +10,7 @@ from main import hash_password
 import pytest
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///D:\\database.db"
+
 engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=False)
 TestSessionLocal = sessionmaker(autoflush=False, autocommit=False, bind=engine)
 Base.metadata.create_all(bind=engine)
@@ -48,10 +49,9 @@ def test_register_user():
 
 
 def test_login_user(get_test_db):
-    db = get_test_db
     password_plain = 'aaw213'
     hashed_password = hash_password(password_plain)
-
+    db = get_test_db
     new_user = User(username='user', email='test12@mail.ru', password=hashed_password)
     db.add(new_user)
     db.commit()
@@ -89,7 +89,6 @@ def test_deposit():
         "Authorization": f"Bearer {token}"
     }
     params = {
-        "fs_id": 3,
         "amount": 1000
     }
     response = client.post("/deposit", headers=headers, params=params)
@@ -118,7 +117,6 @@ def test_withdraw():
         "Authorization": f"Bearer {token}"
     }
     params = {
-        "fs_id": 3,
         "amount": 5000
     }
     response = client.post("/withdraw", headers=headers, params=params)
@@ -457,20 +455,3 @@ def test_show_balance_user_not_found():
     response = client.get("/show-balance", headers=headers, params=params)
     assert response.status_code == 400
     assert response.json()["detail"] == "Пользователь не найден"
-
-
-# def test_deposit_user_not_found_new():  # Проверяет и выдает ошибку от метода get_current_user
-#     fake_username = "testuser"
-#     payload = {
-#         "sub": fake_username,
-#         "exp": datetime.now(timezone.utc) + timedelta(minutes=15)
-#     }
-#     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-#
-#     headers = {"Authorization": f"Bearer {token}"}
-#     params = {"fs_id": 1, "amount": 1000}
-#
-#     response = client.post("/deposit", headers=headers, params=params)
-#
-#     assert response.status_code == 400
-#     assert response.json()["detail"] == "Пользователь не найден"
