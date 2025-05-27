@@ -53,7 +53,7 @@ jobs:
         with:
           name: Pytest Results
           path: test-results/results.xml
-          reporter: junit
+          reporter: pytest-xml
 
 
       - name: Deploy report to Github Pages
