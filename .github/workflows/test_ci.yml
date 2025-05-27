@@ -24,7 +24,7 @@ jobs:
 
       - name: Test with pytest
         run: |
-          pytest
+          mkdir -p test-results
           pytest --junitxml=test-results/results.xml
 
       - name: Upload test results
@@ -40,9 +40,7 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-        with:
-          ref: main
-          path: result
+        
 
       - name: Download test results
         uses: actions/download-artifact@v4
@@ -68,12 +66,12 @@ jobs:
   automerge:
     needs: run-tests
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == false
+    if: success() && github.event.pull_request.merged == false
     steps:
       - name: Automerge PR (with required label)
         uses: reitermarkus/automerge@v2
         with:
-          token: ${{ secrets.MY_GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           merge-method: rebase
           do-not-merge-labels: never-merge
           required-labels: automerge
