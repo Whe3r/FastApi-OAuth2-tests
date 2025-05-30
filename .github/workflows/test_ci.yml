@@ -46,5 +46,5 @@ jobs:
           merge-method: rebase
           do-not-merge-labels: never-merge
           required-labels: automerge
-          review: 1
+          review: 0
           dry-run: false
