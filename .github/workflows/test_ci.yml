@@ -35,7 +35,6 @@ jobs:
           path: test-results
 
   merge:
-    if: github.actor == 'managedkaos'
     needs: [run-tests]
     runs-on: ubuntu-latest
     steps:
