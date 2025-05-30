@@ -34,16 +34,17 @@ jobs:
           name: test-results
           path: test-results
 
-  merge:
-    needs: [run-tests]
+  automerge:
+    needs: run-tests
     runs-on: ubuntu-latest
+    if: success() && github.event.pull_request.merged == false
     steps:
-    - uses: actions/checkout@v3.3.0
-    - name: Auto Approve
-      uses: hmarr/auto-approve-action@v3.1.0
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-    - name: Pull Request Merginator
-      uses: managedkaos/merge-pull-request@v2.1.1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Automerge PR (with required label)
+        uses: reitermarkus/automerge@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          merge-method: rebase
+          do-not-merge-labels: never-merge
+          required-labels: automerge
+          review: 0
+          dry-run: false
