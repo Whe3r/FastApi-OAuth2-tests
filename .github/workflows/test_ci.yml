@@ -40,7 +40,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3.3.0
     - name: Auto Approve
-      uses: Whe3r/auto-approve-action@v3.1.0
+      uses: hmarr/auto-approve-action@v3.1.0
       with:
         github-token: ${{ secrets.MY_GITHUB_TOKEN }}
     - name: Pull Request Merginator
