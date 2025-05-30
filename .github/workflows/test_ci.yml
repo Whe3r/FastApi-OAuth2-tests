@@ -24,7 +24,7 @@ jobs:
 
       - name: Test with pytest
         run: |
-          pytest
+          mkdir -p test-results
           pytest --junitxml=test-results/results.xml
 
       - name: Upload test results
@@ -34,48 +34,17 @@ jobs:
           name: test-results
           path: test-results
 
-  publish-report:
-    needs: [run-tests]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          path: result
-
-      - name: Download test results
-        uses: actions/download-artifact@v4
-        with:
-          name: test-results
-          path: test-results
-
-      - name: Generate report
-        uses: simple-elf/tests-report-action@v1.12
-        if: always()
-        with:
-          test_results: test-results
-          test_history: test-history
-
-      - name: Deploy report to Github Pages
-        if: always()
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: gh-pages
-          publish_dir: test-history
-
   automerge:
     needs: run-tests
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == false
+    if: success() && github.event.pull_request.merged == false
     steps:
       - name: Automerge PR (with required label)
         uses: reitermarkus/automerge@v2
         with:
-          token: ${{ secrets.MY_GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           merge-method: rebase
           do-not-merge-labels: never-merge
           required-labels: automerge
-          review: true
+          review: 1
           dry-run: false
